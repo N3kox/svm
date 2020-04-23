@@ -1,5 +1,5 @@
 //BISTU SE 20 AVSVM PROGECT
-//lex & parser
+//scanner & lex & parser
 //author : xzn
 //date : 4.20.2020
 
@@ -99,8 +99,8 @@ int lex(const char *src) {
 /// Part B: 名称管理
 #define SIZEGLOBAL 1024
 #define SIZELOCAL 1024
-enum { NM_VAR = 1, NM_FUNC};            //名称类型
-enum { AD_DATA = 0, AD_STACK, AD_CODE}; //地址类型
+enum { NM_VAR = 1, NM_FUNC};                //名称类型
+enum { AD_DATA = 0, AD_STACK, AD_CODE};     //地址类型 : AD_DATA 静态,常量 ; AD_STACK 形参,局部变量 ; CODE 函数,方法..
 typedef struct _Name {
     int type;           // VAR 变量 | FUNC 函数
     char *dataType;     // 数据类型
@@ -114,9 +114,7 @@ Name *LName[SIZELOCAL];
 int nGlobal, nLocal;
 
 /*
- * func: 新增Name信息
  * domian: 0-global, 1-local
- * else: Name build
  */
 Name *appendName(int domain, int type, char *dataType, char *name, int addrType, intptr_t addr) {
     Name nm = {type, dataType, name, addrType, addr};
@@ -138,7 +136,6 @@ Name *appendName(int domain, int type, char *dataType, char *name, int addrType,
 }
 
 /*
- * func: 指定域搜索
  * domian: 0-global, 1-local
  */
 Name *getNameFromTable(int domain, int type, char *name, int fErr) {
@@ -155,9 +152,7 @@ Name *getNameFromTable(int domain, int type, char *name, int fErr) {
     return NULL;
 }
 
-/*
- * func: Name表全搜索
- */
+
 Name *getNameFromAllTable(int type, char *name, int fErr) {
     Name *pName = getNameFromTable(1, type, name, fErr);    //search local first
     if (pName != NULL)
@@ -189,7 +184,7 @@ Name *getNameFromAllTable(int type, char *name, int fErr) {
 /// Program ::= (FunctionDefinition | VariableDeclaration ";")*
 
 void expression(int mode);
-void statement(intptr_t next, intptr_t expr);
+void statement(intptr_t locBreak, intptr_t locContinue);
 
 typedef struct _INSTRUCT {
     int opcode;     // operator
@@ -202,8 +197,8 @@ enum { PUSH = 0, ENTRY, POP, MOV, ADD, ADDSP, SUB, MUL, DIV, MOD, RET, CALL, JZ,
 char* OPCODE[] = { "push", "entry", "pop", "mov", "add", "addsp", "sub", "mul", "div", "mod", "ret", "call", "jz", "jmp", "cmp", "lt", "gt", "le", "ge", "eq", "ne", "func", "label" };
 
 // all types
-enum { NIL, IMM, STR, MEM, REF, SKV, SKR, LOC, SP };
-char* TYPE[] = { "nil", "int", "str", "mem", "ref", "stack-val", "stack-ref", "loc", "sp" };
+enum { NIL, IMM, STR, MEM, REF, SKV, SKR };
+char* TYPE[] = { "nil", "int", "str", "mem", "ref", "stack-val", "stack-ref" };
 
 #define SIZEDATASECTION 1024
 enum { VAL = 0, ADDR };                 // VAL: 内容, ADDR: 地址
@@ -255,7 +250,7 @@ void skip(char* s){
     }
 }
 
-/// 打印中间?码
+/// 打印中间码
 void printInst(int n, INSTRUCT* pI){
     printf("%3d: ", n);
     printf("%s ", OPCODE[pI->opcode]);
@@ -285,24 +280,27 @@ INSTRUCT* outInst(int code){
 /// 表达式解析
 /// PrimExpression ::= Identifier | "(" Expr ")" | Constant | FunctionCall
 
+/// 函数调用
+/// functionCall ::= function_name "(" Expression [ "," Expression ] ")"
 void funcionCall(){
     int n,
         nParam,         // 参数数量计数
         posParam[20],   // 参数名
         nInstSave,      // instance缓存
         ixDataSave,     // data缓存
-        ixNext;         // 记录tix+1位置
-    char* name = Token[tix++];
+        ixNext;         // 记录tix+1
+
+    char* name = Token[tix++];  // functionName
     Name* pName = getNameFromTable(0, NM_FUNC, name, 1);
     skip("(");
 
-    // 参数最后按顺序入栈
+    // 参数最后入栈
     // 先求参数位置
     nInstSave = nInst;
     ixDataSave = ixData;
 
-    for (nParam = 0; !is(")"); nParam++){   // 函数参数解析
-        posParam[nParam] = tix;     //各参数位置（tix）存表
+    for (nParam = 0; !is(")"); nParam++){   // 参数解析
+        posParam[nParam] = tix;             //各参数位置（tix）存表
         expression(VAL);
         ispp(",");
     }
@@ -313,7 +311,7 @@ void funcionCall(){
 
     for(n = nParam; --n >= 0;){
         tix = posParam[n];
-        expression(VAL);    // 从最后开始按顺序解释参数并堆叠
+        expression(VAL);    // 倒序解释参数并堆叠
     }
 
     tix = ixNext;
@@ -326,8 +324,9 @@ void funcionCall(){
 }
 
 
-void primaryExpression(int mode){   // #1
+void primaryExpression(int mode){   // 顶层解析
     if(isdigit(*Token[tix])){       // 数值常量
+        // TODO: atoi - strtol : error control
         outInst2(PUSH, IMM, atoi(Token[tix++]));
     }else if(*Token[tix] == '"'){      // 字符串常量
         outInst2(PUSH, STR, (intptr_t)Token[tix++]);
@@ -351,19 +350,19 @@ void primaryExpression(int mode){   // #1
 /// MulExp ::= PriExp(( "*" | "/" | "%" ) PriExp )*
 void mulExpression(int mode){
     int fMul = 0, fDiv = 0;
-    primaryExpression(mode);
+    primaryExpression(mode);    // PriExp
     while((fMul = ispp("*")) || (fDiv = ispp("/")) || ispp("%")){
         primaryExpression(mode);
         outInst(fMul ? MUL : fDiv ? DIV : MOD);
-    }
+    }   // (( "*" | "/" | "%" ) PriExp )
 }
 
 
 /// AddExp ::= MulExp(( "+" | "-") MulExp) *
 void addExpression(int mode){
     int fAdd;
-    mulExpression(mode);
-    while((fAdd = ispp("+")) || ispp("-")){
+    mulExpression(mode);        // MulExp
+    while((fAdd = ispp("+")) || ispp("-")){ // ( "+" | "-") MulExp
         mulExpression(mode);
         outInst(fAdd ? ADD : SUB);
     }
@@ -371,42 +370,43 @@ void addExpression(int mode){
 
 
 /// RelationalExpression ::= addExpr [("<" | ">" | "<=" | ">=") addExpr]
-void relationalExpression(int mode) {    // #7 带符号整数
+void relationalExpression(int mode) {    // 带符号整数
     int fLT=0, fGT=0, fLE=0;
-    addExpression(mode);        // 左侧值
+    addExpression(mode);        // addExpr
     if ((fLT = ispp("<")) || (fGT = ispp(">")) || (fLE = ispp("<=")) || ispp(">=")){
-        addExpression(mode);    // 右侧值，左侧值
+        addExpression(mode);
         outInst(fLT ? LT : fGT ? GT : fLE ? LE : GE);
-    }
+    }   // [("<" | ">" | "<=" | ">=") addExpr]
 }
 
 
 /// EqualityExpression ::= RelationalExpr [ ("==" | "!=") RelationalExpr ]
-void equalityExpression(int mode) { // #8
+void equalityExpression(int mode) {
     int fEQ;
-    relationalExpression(mode);         // 左侧值
-    if ((fEQ = ispp("==")) || ispp("!=")) {
-        relationalExpression(mode);     // 右侧值，左侧值
+    relationalExpression(mode);         // RelationalExpr
+    if ((fEQ = ispp("==")) || ispp("!=")) { // [ ("==" | "!=") RelationalExpr ]
+        relationalExpression(mode);
         outInst(fEQ ? EQ : NE);
     }
 }
 
-
+/// 赋值
 void assign() {
-    primaryExpression(ADDR);     // 左侧变量地址
+    primaryExpression(ADDR);     // var
     skip("=");
-    addExpression(VAL);         // 右侧值，左侧变量地址
+    addExpression(VAL);         // val
     outInst(MOV);               // Mem[st1] = st0
 }
 
 
-/// expression ::= [Identifier "="] addExpression
+/// expression ::= [Identifier "="] EqualityExpression
 void expression(int mode){
-    if(strcmp(Token[tix+1], "=") == 0)  // ==
+    if(strcmp(Token[tix+1], "=") == 0)  // [Identifier "="]
         assign();
     else
-        equalityExpression(mode);       // =
+        equalityExpression(mode);       // addExpression
 }
+
 
 /*
  * 语法分析
@@ -429,6 +429,9 @@ char* varDeclarator(){
 }
 
 /// VariableDeclaration ::= TypeSpecifier VarDeclarator ["=" Initializer]  ("," VarDeclarator ["=" Initializer])*
+/// var like : [ int | char* ] name1 = var1, name2 = var2, ...... ;
+/// void 类型未提出变量类型
+/// ";" 由 program() 处理
 void variableDeclaration(int status){
     char* varType = typeSpecifier();
     do{
@@ -447,9 +450,11 @@ void variableDeclaration(int status){
     }while (ispp(","));
 }
 
+
 /// 复合语句
 /// CompoundStatement ::= "{" (Statements)* "}"
 void compoundStatement(intptr_t locBreak, intptr_t locContinue){
+    // 由于只写了quote检查，no bracket pair类型的语法错误只能通过tix<nToken检验
     for(skip("{"); tix<nToken && isTypeSpecifier(); skip(";"))
         variableDeclaration(ST_FUNC);
     while(!ispp("}"))
@@ -548,7 +553,7 @@ void functionDefinition(){
 int program(){
     err = 0;
     nInst = 0;
-    entryPoint = -1;
+    entryPoint = -1;    //main函数检测
     numLabel = 1;
     for (tix = 0; tix < nToken;) {
         if (isFunctionDefinition()) {
@@ -574,7 +579,7 @@ int parser() {
     appendName(0, NM_FUNC, "void", "putstr", AD_CODE, 0);
     appendName(0, NM_FUNC, "void", "putnum", AD_CODE, 0);
     return program();
-};
+}
 
 int main(int argc, char *argv[]) {
     char *src = NULL;
@@ -622,5 +627,6 @@ int main(int argc, char *argv[]) {
     for(int i = 0; i<nToken; i++){
         free(Token[i]);
     }
+
     return 0;
 }
