@@ -1,8 +1,8 @@
 - # SVM
 
-  Easy compiler & vm for clike languague. SE20
+  Easy compiler & vm for clike languague.
 
-  For study only.
+  For study only. SE20
 
   ## Install
 
