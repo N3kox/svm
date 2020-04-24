@@ -31,11 +31,11 @@
 
   ## References
 
-  [write-a-C-interpreter](https://github.com/lotabout/write-a-C-interpreter)
+  - [write-a-C-interpreter](https://github.com/lotabout/write-a-C-interpreter)
 
-  [LC3 computer](https://en.wikipedia.org/wiki/Little_Computer_3)
+  - [LC3 computer](https://en.wikipedia.org/wiki/Little_Computer_3)
 
-  [LC3-vm](https://github.com/justinmeiners/lc3-vm)
+  - [LC3-vm](https://github.com/justinmeiners/lc3-vm)
 
   
 
