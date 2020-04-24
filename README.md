@@ -23,8 +23,8 @@
 
   ## Limits
 
-  1. Cannot self interpret (macro not supported)
-  2. Limited output methods (.c files under /test show details)
+ 1. Cannot self interpret (macro not supported)
+ 2. Limited output methods (.c files under /test show details)
 
   
 
