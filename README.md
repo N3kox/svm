@@ -17,14 +17,15 @@
   ```sh
   # Compile
   $ slp -d -to -tr test/recur.c -o out.o
+  
   # Load & Execute
   $ le -t out.o
   ```
 
   ## Limits
 
-  1. Cannot self interpret (macro not supported)
-  2. Limited output methods (.c files under /test show details)
+  - Cannot self interpret (macro not supported)
+  - Limited output methods (.c files under /test show details)
 
   
 
