@@ -9,7 +9,6 @@
 #include <stdint.h>
 
 #define TKSIZE 1000
-
 #define LEN2OP "== != <= >= != += -= *= /= >> << ++ -- && || ->"
 
 int debug;
@@ -97,6 +96,7 @@ int lex(const char *src) {
 }
 
 /// Part B: 名称管理
+
 #define SIZEGLOBAL 1024
 #define SIZELOCAL 1024
 enum { NM_VAR = 1, NM_FUNC};                //名称类型
@@ -183,27 +183,13 @@ Name *getNameFromAllTable(int type, char *name, int fErr) {
 /// FunctionDefinition ::= TypeSpecifier  VarDeclarator "(" [ VarDeclaration ("," VarDeclaration)* ] ")" CompoundStatement
 /// Program ::= (FunctionDefinition | VariableDeclaration ";")*
 
+#include "static.h"
 void expression(int mode);
 void statement(intptr_t locBreak, intptr_t locContinue);
 
-typedef struct _INSTRUCT {
-    int opcode;     // operator
-    int type;
-    intptr_t val;
-} INSTRUCT;
-
-// all opcodes
-enum { PUSH = 0, ENTRY, POP, MOV, ADD, ADDSP, SUB, MUL, DIV, MOD, RET, CALL, JZ, JMP, CMP, LT, GT, LE, GE, EQ, NE, FUNC, LABEL };
-char* OPCODE[] = { "push", "entry", "pop", "mov", "add", "addsp", "sub", "mul", "div", "mod", "ret", "call", "jz", "jmp", "cmp", "lt", "gt", "le", "ge", "eq", "ne", "func", "label" };
-
-// all types
-enum { NIL, IMM, STR, MEM, REF, SKV, SKR };
-char* TYPE[] = { "nil", "int", "str", "mem", "ref", "stack-val", "stack-ref" };
-
 #define SIZEDATASECTION 1024
-enum { VAL = 0, ADDR };                 // VAL: 内容, ADDR: 地址
-enum { ST_FUNC = 0, ST_GVAR };          // ST_FUNC: 函数定义, ST_GVAR: 变量声明
 char* DataSection[SIZEDATASECTION];     // 变量+字符串管理
+
 int ixData;                             // 管理数据计数
 intptr_t baseSpace;                     // 堆栈相对地址
 
@@ -281,7 +267,7 @@ INSTRUCT* outInst(int code){
 /// PrimExpression ::= Identifier | "(" Expr ")" | Constant | FunctionCall
 
 /// 函数调用
-/// functionCall ::= function_name "(" Expression [ "," Expression ] ")"
+/// FunctionCall ::= function_name "(" Expression [ "," Expression ] ")"
 void funcionCall(){
     int n,
         nParam,         // 参数数量计数
@@ -436,13 +422,13 @@ void variableDeclaration(int status){
     char* varType = typeSpecifier();
     do{
         char* varName = varDeclarator();
-        if(status == ST_FUNC){
+        if(status == ST_FUNC){  // 函数内定义局部变量
             appendName(1, NM_VAR, varType, varName, AD_STACK, --baseSpace);
             if(is("=")){
                 tix--;
                 assign();
             }
-        }else{
+        }else{                  // 函数外定义全局变量
             appendName(0, NM_VAR, varType, varName, AD_DATA, ixData);
             if(ispp("="))
                 DataSection[ixData++] = Token[tix++];
@@ -581,8 +567,112 @@ int parser() {
     return program();
 }
 
+
+typedef unsigned char *byte_pointer;
+// 二进制输出
+void formatOutput(FILE* file, byte_pointer start, int size){
+    int ttlSize = size * 8;
+    int buf[ttlSize];
+    memset(buf, 0, sizeof(buf));
+    for(int i = 0; i < size; i++){
+        for(int j = 0; j < 8; j++){
+            buf[ttlSize - (i*8) - j - 1] = (start[i] >> j) & 0x1;
+        }
+    }
+    for(int i = 0; i < ttlSize; i++){
+        fprintf(file, "%d", buf[i]);
+    }
+
+    putc(' ', file);
+
+}
+
+// 字符串逐字写入
+void formatOutputString(FILE* file,const char* str,int len){
+    int buf[8];
+    for(int i = 0;i<len;i++){
+        for(int j = 0;j < 8; j++)
+            buf[7-j] = (str[i] >> j) & 0x1;
+        if(debug)
+            printf("#DEBUG: buf:");
+        for(int p = 0; p < 8; p++){
+            fprintf(file, "%d", buf[p]);
+            if(debug)printf("buf:%d", buf[p]);
+        }
+        if(debug)
+            printf("\n");
+        putc(' ',file);
+    }
+}
+
+// 写入文件
+int writeImage(char* fileName,int param){
+    FILE* file = fopen(fileName, "w");
+    INSPTR insptr;
+
+    int intSize = sizeof(int);
+    int opSize = sizeof(insptr->opcode);
+    int typeSize = sizeof(insptr->type);
+    int valSize = sizeof(insptr->val);
+
+    // #1 int entryPoint
+    formatOutput(file, (byte_pointer)&entryPoint, intSize);
+
+    // #2 int nInst
+    formatOutput(file, (byte_pointer)&nInst, intSize);
+
+    // #3 Inst
+    for(int i = 0; i<nInst; i++){
+        formatOutput(file, (byte_pointer)&Inst[i].opcode, opSize);
+        formatOutput(file, (byte_pointer)&Inst[i].type, typeSize);
+        if(Inst[i].type == STR){
+            //printf("%s\n",(char*)Inst[i].val);
+            if(strcmp("putstr",(char*)Inst[i].val) == 0){
+                //printf("putstr\n");
+                int len = strlen("putstr");
+                fputs("0 ",file);   //native
+                formatOutput(file, (byte_pointer)&len, intSize);
+                formatOutputString(file, "putstr", len);
+            }else if(strcmp("putnum",(char*)Inst[i].val) == 0){
+                //printf("putnum\n");
+                int len = strlen("putnum");
+                fputs("00 ",file);   //native
+                formatOutput(file, (byte_pointer)&len, intSize);
+                formatOutputString(file, "putnum", len);
+            }else{
+                fputs("01 ",file);
+                formatOutput(file, (byte_pointer)&Inst[i].val, valSize);
+            }
+        }else{
+            fputs("01 ",file);   //native
+            formatOutput(file, (byte_pointer)&Inst[i].val, valSize);
+        }
+
+    }
+
+    // #4 int ixData
+    formatOutput(file, (byte_pointer)&ixData, intSize);
+
+    for(int i = 0; i<ixData; i++){
+        // #5 sizeof(DataSection[i])
+        int dsSize = strlen(DataSection[i]);  // without '\0'
+        formatOutput(file, (byte_pointer)&dsSize, intSize);
+
+        // #6 DataSection
+        // dsSize 未对齐
+        formatOutputString(file, DataSection[i], dsSize);
+    }
+
+    // #7 param
+    formatOutput(file, (byte_pointer)&param, intSize);
+
+    fclose(file);
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     char *src = NULL;
+    char *outFile = NULL;
     int param = 0;
 
     for (int n = 1; n < argc; n++) {
@@ -595,15 +685,21 @@ int main(int argc, char *argv[]) {
         }else if(strcmp(argv[n], "-tr") == 0){
             fTrace = 1;
             printf("#AVSVM: Trace mode on!\n");
-        }
-        else if (src == NULL) src = argv[n];
-        else param = atoi(argv[n]);
+        }else if(strcmp(argv[n], "-o") == 0){
+            if(n + 1 < argc){
+                outFile = argv[++n];
+            }
+        }else if (src == NULL)
+            src = argv[n];
+        else
+            param = atoi(argv[n]);
     }
 
-    if (!src) {
-        printf("#AVSVM: Usage: build.o [-d][-to][-tr] src.c\n");
+    if (!src || !outFile) {
+        printf("#AVSVM: Usage: avsvm_slp [-o outputFile][-d][-to][-tr] src.c\n");
         return -1;
     }
+
     if(debug) printf("#DEBUG: Param:%d\n",param);
 
     lex(src);
@@ -621,11 +717,13 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    //exec(param);
-
     //strdup内存泄漏处理
     for(int i = 0; i<nToken; i++){
         free(Token[i]);
+    }
+
+    if(writeImage(outFile, param)){
+        printf("#Error: fail in writing %s\n",outFile);
     }
 
     return 0;
