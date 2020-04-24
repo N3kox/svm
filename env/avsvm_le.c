@@ -1,8 +1,6 @@
-//
 // Created by xzn on 2020/4/23.
-//
-
 // load & execute
+// author : xzn
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +12,7 @@
 
 /// load from file
 
-int fTrace = 0;
+int traceMode = 0;
 int entryPoint;
 int nInst;
 int ixData;
@@ -93,7 +91,8 @@ int execute() {
     push(param);
     push(-1);
     while (pc < nInst) {
-        if (fTrace) printInst(pc, &Inst[pc]);
+        if (traceMode)
+            printInst(pc, &Inst[pc]);
         int type = Inst[pc].type;
         intptr_t val  = Inst[pc].val;
         switch (Inst[pc++].opcode) {
@@ -283,14 +282,23 @@ void loadImage(char* fileName){
 
 int main(int argc, char *argv[]) {
     char* fileName;
+    if(argc == 1){
+        printf("#AVSVM: Usage: avsvm_le [-t] src.o\n");
+        return 0;
+    }
 
-    if(argc == 1)
-        printf("#AVSVM: Usage: avsvm_le src.o\n");
-
-    fileName = argv[1];
+    for(int i = 1;i<argc; i++){
+        if(strcmp(argv[i], "-t") == 0){
+            traceMode = 1;
+        }else{
+            fileName = argv[i];
+        }
+    }
+    // 装载
     loadImage(fileName);
 
+    // 执行
     execute();
-    //printf("end\n");
+
     return 0;
 }
