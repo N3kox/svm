@@ -1,4 +1,4 @@
-//BISTU SE 20 AVSVM PROGECT
+//BISTU SE 20 AVSVM PROJECT
 //scanner & lex & parser
 //author : xzn
 //date : 4.20.2020
@@ -96,7 +96,6 @@ int lex(const char *src) {
 }
 
 /// Part B: 名称管理
-
 #define SIZEGLOBAL 1024
 #define SIZELOCAL 1024
 enum { NM_VAR = 1, NM_FUNC};                //名称类型
@@ -670,6 +669,14 @@ int writeImage(char* fileName,int param){
     return 0;
 }
 
+
+/* main
+ * src : src file
+ * -d : debug
+ * -to : print token
+ * -tr : print trace
+ * -o : +output file name
+ */
 int main(int argc, char *argv[]) {
     char *src = NULL;
     char *outFile = NULL;
