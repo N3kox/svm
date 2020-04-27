@@ -589,14 +589,18 @@ void formatOutput(FILE* file, byte_pointer start, int size){
 // 字符串逐字写入
 void formatOutputString(FILE* file,const char* str,int len){
     int buf[8];
+
     for(int i = 0;i<len;i++){
-        for(int j = 0;j < 8; j++)
-            buf[7-j] = (str[i] >> j) & 0x1;
         if(debug)
             printf("#DEBUG: buf:");
+        
+        for(int j = 0;j < 8; j++)
+            buf[7-j] = (str[i] >> j) & 0x1;
+
         for(int p = 0; p < 8; p++){
             fprintf(file, "%d", buf[p]);
-            if(debug)printf("buf:%d", buf[p]);
+            if(debug)
+                printf("%d", buf[p]);
         }
         if(debug)
             printf("\n");
