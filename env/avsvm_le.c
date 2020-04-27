@@ -139,7 +139,7 @@ int execute() {
                     if (strcmp("putstr", fn) == 0) {
                         rtn = printf("%s\n", (const char*)mem[sp]);
                     } else if (strcmp("putnum", fn) == 0) {
-                        rtn = printf("%d\n", mem[sp]);
+                        rtn = printf("%ld\n", mem[sp]);
                     }
                     push(rtn);
                 } else {
@@ -281,10 +281,10 @@ void loadImage(char* fileName){
 }
 
 int main(int argc, char *argv[]) {
-    char* fileName;
+    char* fileName = NULL;
     if(argc == 1){
         printf("#AVSVM: Usage: avsvm_le [-t] src.o\n");
-        return 0;
+        return 1;
     }
 
     for(int i = 1;i<argc; i++){
@@ -294,6 +294,11 @@ int main(int argc, char *argv[]) {
             fileName = argv[i];
         }
     }
+    if(fileName == NULL){
+        printf("#AVSVM: Usage: avsvm_le [-t] src.o\n"); 
+        return 1;
+    }
+             
     // 装载
     loadImage(fileName);
 
