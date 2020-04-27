@@ -316,6 +316,13 @@ int main(int argc, char *argv[]) {
             fileName = argv[i];
         }
     }
+
+    if(fileName == NULL){
+        printf("#AVSVM: Usage: avsvm_le [-t] src.o\n");
+        return 1;
+    }
+
+
     // 装载
     loadImage(fileName);
 
