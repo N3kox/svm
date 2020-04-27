@@ -695,6 +695,9 @@ int main(int argc, char *argv[]) {
         }else if(strcmp(argv[n], "-o") == 0){
             if(n + 1 < argc){
                 outFile = argv[++n];
+            }else{
+                printf("#AVSVM:No output file name after param -o !\n");
+                exit(1);
             }
         }else if (src == NULL)
             src = argv[n];
@@ -702,7 +705,7 @@ int main(int argc, char *argv[]) {
             param = atoi(argv[n]);
     }
 
-    if (!src || !outFile) {
+    if (!src) {
         printf("#AVSVM: Usage: avsvm_slp [-o outputFile][-d][-to][-tr] src.c\n");
         return -1;
     }
@@ -729,8 +732,8 @@ int main(int argc, char *argv[]) {
         free(Token[i]);
     }
 
-    if(writeImage(outFile, param)){
-        printf("#Error: fail in writing %s\n",outFile);
+    if(outFile != NULL && writeImage(outFile, param)){
+        printf("#Error: fail while writing %s\n",outFile);
     }
 
     return 0;
