@@ -252,8 +252,6 @@ void loadImage(char* fileName){
                 str[strSize] = '\0';
                 DataSection[ixData] = strdup(str);
                 Inst[n].val = ixData++;
-                printf("strsize:%d\n",strSize);
-                printf("val:%s\n",DataSection[Inst[n].val]);
             }else{
                 readBi(file);
                 int nativeLen = (int)B2D(buf);
@@ -282,8 +280,7 @@ void loadImage(char* fileName){
     readBi(file);
     int n = ixData;
     ixData = ixData + (int)B2D(buf);
-
-    for(n;n<ixData;n++){
+    for(;n<ixData;n++){
         readBi(file);
         int dsLen = B2D(buf);
         char ds[dsLen];
