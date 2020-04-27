@@ -7,3 +7,4 @@ le: env/avsvm_le.c
 .PHONY:clean
 clean:
 	rm slp le
+	rm *.o
