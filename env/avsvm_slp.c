@@ -625,11 +625,21 @@ int writeImage(char* fileName,int param){
         formatOutput(file, (byte_pointer)&Inst[i].opcode, opSize);
         formatOutput(file, (byte_pointer)&Inst[i].type, typeSize);
         if(Inst[i].type == STR){
+
             //printf("%s\n",(char*)Inst[i].val);
-            if(strcmp("putstr",(char*)Inst[i].val) == 0){
+            if(Inst[i].opcode == PUSH){
+                //字符串临时输出，不放于DataSection
+                fputs("00 ",file);
+                char* str = (char*)Inst[i].val;
+                int strSize = strlen(str);  // without '\0'
+
+                formatOutput(file, (byte_pointer)&strSize, intSize);    //字符串长度
+                formatOutputString(file, str, strSize); //字符串内容
+
+            }else if(strcmp("putstr",(char*)Inst[i].val) == 0){
                 //printf("putstr\n");
                 int len = strlen("putstr");
-                fputs("0 ",file);   //native
+                fputs("00 ",file);   //native
                 formatOutput(file, (byte_pointer)&len, intSize);
                 formatOutputString(file, "putstr", len);
             }else if(strcmp("putnum",(char*)Inst[i].val) == 0){
@@ -695,6 +705,9 @@ int main(int argc, char *argv[]) {
         }else if(strcmp(argv[n], "-o") == 0){
             if(n + 1 < argc){
                 outFile = argv[++n];
+            }else{
+                printf("#AVSVM: No output file!\n");
+                exit(1);
             }
         }else if (src == NULL)
             src = argv[n];
@@ -702,7 +715,7 @@ int main(int argc, char *argv[]) {
             param = atoi(argv[n]);
     }
 
-    if (!src || !outFile) {
+    if (!src) {
         printf("#AVSVM: Usage: avsvm_slp [-o outputFile][-d][-to][-tr] src.c\n");
         return -1;
     }
@@ -728,8 +741,7 @@ int main(int argc, char *argv[]) {
     for(int i = 0; i<nToken; i++){
         free(Token[i]);
     }
-
-    if(writeImage(outFile, param)){
+    if(outFile!=NULL && writeImage(outFile, param)){
         printf("#Error: fail in writing %s\n",outFile);
     }
 

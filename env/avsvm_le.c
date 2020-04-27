@@ -20,7 +20,6 @@ int param;
 INSTRUCT Inst[MAXMEM];
 char* DataSection[MAXMEM];
 
-
 intptr_t mem[MAXMEM];       // mem
 intptr_t sp,                // 堆栈指针
          bp,                // 基准指针
@@ -29,7 +28,8 @@ intptr_t sp,                // 堆栈指针
 char* ps = "putstr";
 char* pn = "putnum";
 
-intptr_t pos;               // mem索引
+intptr_t pos = 0;               // mem索引
+
 intptr_t location[1024];    // 标签地址排列
 
 void error(char *errMes){
@@ -66,7 +66,12 @@ void printInst(int n, INSTRUCT* pI){
         //NIL print over
     } else if (pI->type == STR) {
         printf("%s ", TYPE[pI->type]);
-        printf("%s", (const char*)pI->val);
+        if(pI->opcode == PUSH){
+            printf("%s", DataSection[pI->val]);
+        }else{
+            printf("%s", (const char*)pI->val);
+        };
+
     } else {
         printf("%s ", TYPE[pI->type]);
         printf("%ld", pI->val);
@@ -76,7 +81,7 @@ void printInst(int n, INSTRUCT* pI){
 
 
 int execute() {
-    pos = 0;
+    //pos = 0;
     intptr_t addr, rtn;
 
     for (int n = 0; n < nInst; n++) {
@@ -110,7 +115,7 @@ int execute() {
             case PUSH:
                 if (type == SKV) push(mem[bp + val]);           // push Local
                 else if (type == SKR) push(bp + val);           // push Local Addr
-                else if (type == STR) push(getStr((char*)val));     // push 字符串地址
+                else if (type == STR) push(getStr(DataSection[val]));     // push 字符串地址
                 else if (type == IMM) push(val);
                 else{ printf("exec.PUSH: %d", type); exit(1); }
                 break;
@@ -139,7 +144,7 @@ int execute() {
                     if (strcmp("putstr", fn) == 0) {
                         rtn = printf("%s\n", (const char*)mem[sp]);
                     } else if (strcmp("putnum", fn) == 0) {
-                        rtn = printf("%d\n", mem[sp]);
+                        rtn = printf("%ld\n", mem[sp]);
                     }
                     push(rtn);
                 } else {
@@ -211,7 +216,7 @@ void loadImage(char* fileName){
     //    int Inst[x].type
     //    int Inst[x].val
     // #4 int ixData
-    // #5 sizeof(DataSection[i])
+    // #5 strlen(DataSection[i])
     // #6 DataSection
     // #7 param
 
@@ -236,22 +241,38 @@ void loadImage(char* fileName){
 
         readBi(file);
         if(Inst[n].type == STR && (flag = (int)B2D(buf)) == 0){ //native
-            readBi(file);
-            int nativeLen = (int)B2D(buf);
-            char nativeName[nativeLen];
-            for(int m = 0;m < nativeLen;m++){
+            if(Inst[n].opcode == PUSH){
                 readBi(file);
-                nativeName[m] = (char)B2D(buf);
+                int strSize = (int)B2D(buf);
+                char str[strSize];
+                for(int m = 0;m < strSize; m++){
+                    readBi(file);
+                    str[m] = (char)B2D(buf);
+                }
+                str[strSize] = '\0';
+                DataSection[ixData] = strdup(str);
+                Inst[n].val = ixData++;
+                printf("strsize:%d\n",strSize);
+                printf("val:%s\n",DataSection[Inst[n].val]);
+            }else{
+                readBi(file);
+                int nativeLen = (int)B2D(buf);
+                char nativeName[nativeLen];
+                for(int m = 0;m < nativeLen;m++){
+                    readBi(file);
+                    nativeName[m] = (char)B2D(buf);
+                }
+                nativeName[nativeLen] = '\0';
+                if(strcmp(nativeName, ps) == 0)
+                    Inst[n].val = (intptr_t)ps;
+                else if(strcmp(nativeName, pn) == 0)
+                    Inst[n].val = (intptr_t)pn;
+                else{
+                    printf("unknown native name %s\n",nativeName);
+                    exit(1);
+                }
             }
-            nativeName[nativeLen] = '\0';
-            if(strcmp(nativeName, ps) == 0)
-                Inst[n].val = (intptr_t)ps;
-            else if(strcmp(nativeName, pn) == 0)
-                Inst[n].val = (intptr_t)pn;
-            else{
-                printf("unknown native name %s\n",nativeName);
-                exit(1);
-            }
+
         }else{
             readBi(file);
             Inst[n].val = (intptr_t )B2D(buf);
@@ -259,9 +280,10 @@ void loadImage(char* fileName){
     }
 
     readBi(file);
-    ixData = (int)B2D(buf);
+    int n = ixData;
+    ixData = ixData + (int)B2D(buf);
 
-    for(int n = 0;n<ixData;n++){
+    for(n;n<ixData;n++){
         readBi(file);
         int dsLen = B2D(buf);
         char ds[dsLen];
