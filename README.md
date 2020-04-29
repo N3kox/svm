@@ -24,8 +24,10 @@
 
   ## Limits
 
-  - Cannot self interpret (macro not supported)
-  - Limited output methods (.c files under /test show details)
+  - Cannot self interpret (macro not supported).
+  - Limited output methods (.c files under test/ show details).
+  - Bad ISA!!
+  - Software traps currently not added.
 
   
 
